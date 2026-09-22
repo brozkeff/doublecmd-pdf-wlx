@@ -1,0 +1,10 @@
+lib/
+build/
+rust/**/target/
+.build-libs/
+.lazarus-config/
+*.compiled
+*.ppu
+*.o
+link*.res
+*.wlx
