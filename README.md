@@ -1,152 +1,150 @@
 # PDF WLX viewer for Double Commander
 
-Standalone Linux WLX (Lister) plugin for quick F3 previews of PDF files in
-Double Commander. It uses MuPDF through a runtime `dlopen`/`dlsym` adapter and
-supports Qt5, Qt6, GTK2, and GTK3 builds.
+Standalone Linux WLX plugin for quick PDF previews in Double Commander. Select
+a PDF and press F3 to render a scrollable column of pages inside the internal
+Lister.
+
+Version 0.2.0 is a Rust rewrite. The Qt5 backend is the primary implementation
+and has been manually verified with the official Qt5 Double Commander package.
+A GTK3 backend is also included, but official Double Commander packages do not
+currently provide a matching GTK3 build. Qt6 is planned but not implemented.
+
+The previous Pascal/Lazarus implementation remains available from Git tag
+`v0.1.0` and commit `62e4ac2`.
 
 Copyright (C) 2026 Martin Brozkeff Malec. The plugin source is licensed under
-the [EUPL 1.2](LICENSE). MuPDF is a separate third-party component under the
-[GNU AGPL v3 or later](https://www.gnu.org/licenses/agpl-3.0.html). See
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) before distributing binaries.
+the [EUPL 1.2](LICENSE). MuPDF's `mutool` is a separate runtime program under
+the GNU AGPL v3 or later; see
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-## Usage
+## Features and limits
 
-The plugin claims `*.pdf`. Select a PDF in Double Commander and press F3. The
-internal Lister renders all pages at 120 DPI into native widgets, with a
-scrollable page column. Files that cannot be opened, are encrypted, or exceed
-128 pages are rejected so Double Commander can use its normal fallback.
+- Detects `.pdf` files through the standard WLX ABI.
+- Renders pages at 120 DPI through a `mutool` child process.
+- Rejects invalid, encrypted, empty, and over-128-page documents.
+- Uses private temporary directories and removes rendered pages after native
+  widgets have loaded them.
+- Contains panics and C++ exceptions at the plugin boundary.
+- Keeps unsafe Rust and C++ limited to the documented WLX/native-widget shim.
 
-If neither the shared MuPDF API nor `mutool` can render the document, the
-plugin returns an invalid WLX handle and Double Commander uses its fallback
-viewer.
+PDF parsing happens in the `mutool` child process rather than inside Double
+Commander. If rendering fails, the plugin returns an invalid WLX handle so the
+file manager can use its normal fallback viewer.
 
 ## Runtime requirements
 
-Install the runtime package matching the Double Commander widgetset:
-
-- Qt5: `libqt5pas1` and the Qt5 runtime;
-- Qt6: `libqt6pas6` and the Qt6 runtime;
-- GTK2: `libgtk2.0-0`;
-- GTK3: `libgtk-3-0`;
-- all variants: either a shared MuPDF library exposing the MuPDF C API, or
-  the `mutool` executable from `mupdf-tools`.
-
-The plugin first tries the shared MuPDF API. If that library is unavailable or
-incompatible, it runs `mutool draw` as a subprocess. The subprocess fallback
-therefore needs `mupdf-tools` and `mutool` in the same `PATH` used to start
-Double Commander. Installing the `mupdf` GUI alone is not sufficient.
-
-Check the MuPDF library before installing the plugin:
+The recommended target is the official Qt5 Double Commander package. Install
+the matching Qt5 runtime and MuPDF tools. On Ubuntu or Debian:
 
 ```sh
-ldconfig -p | grep libmupdf
+sudo apt install mupdf-tools libqt5widgets5
 ```
 
-The Ubuntu 22.04 package set used for development provides `libmupdf-dev` as
-static development archives, not a runtime `libmupdf.so`. Installing
-`libmupdf-dev` alone is therefore insufficient for the dynamic API path; use
-`mupdf-tools` for the subprocess fallback. Use a distribution or vendor
-package that provides a compatible shared library, or
-build MuPDF as a shared library from the [official source](https://github.com/ArtifexSoftware/mupdf).
-Keep its transitive runtime dependencies installed as reported by `ldd`.
+`mutool` must be available in the `PATH` inherited by Double Commander. The
+plugin does not bundle or dynamically load MuPDF libraries.
 
-For a locally installed library, for example:
+The optional GTK3 plugin additionally requires the GTK3 runtime and a GTK3
+build of Double Commander. It cannot be loaded into GTK2, Qt5, or Qt6 builds.
 
-```sh
-LD_LIBRARY_PATH=/opt/mupdf/lib doublecmd
+## Install
+
+Use the plugin matching the Double Commander widgetset. For the supported Qt5
+package, select this file from a release or local build:
+
+```text
+build/pdf-wlx-x86_64-linux-qt5.wlx
 ```
 
-The plugin tries `libmupdf.so.25`, `libmupdf.so.1`, and `libmupdf.so`. The
-soname and exported ABI are distribution-specific; use the same MuPDF major
-ABI family used to build and test the plugin.
+In Double Commander, open **Configuration → Options → Plugins → WLX**, choose
+**Add**, select the `.wlx` file, then open a PDF with F3.
 
 ## Build requirements
 
-On Ubuntu 22.04 (Jammy), install the compiler, Lazarus, headers, and matching
-widgetset development packages:
+Install a current Rust toolchain, C++ compiler, `pkg-config`, MuPDF tools, and
+the development package for the selected widgetset. On Ubuntu or Debian:
 
 ```sh
-sudo apt update
-sudo apt install build-essential pkg-config fpc lazarus \
-  libmupdf-dev mupdf-tools libgtk2.0-dev libgtk-3-dev \
-  libqt5pas-dev libqt6pas6-dev
+sudo apt install build-essential cargo pkg-config mupdf-tools qtbase5-dev
 ```
 
-The Jammy-compatible development environment used Free Pascal 3.2.2,
-Lazarus 4.8.0, `libmupdf-dev` and `mupdf-tools` 1.19.0+ds1-2,
-`libgtk2.0-dev` 2.24.33-2ubuntu2.1, `libgtk-3-dev` 3.24.33-1ubuntu2.2,
-`libqt5pas1` 4.2, and `libqt6pas6` plus `libqt6pas6-dev` 6.2.10.
-Package revisions may change with Ubuntu updates; inspect them with
-`dpkg-query -W`.
+For the optional GTK3 target, also install:
+
+```sh
+sudo apt install libgtk-3-dev
+```
+
+The Qt5 build uses Rust 2021, `cc`, and `pkg-config`. A small C++ shim performs
+only QWidget creation and destruction because Qt has no stable C ABI. The
+remaining WLX validation, rendering, temporary-file lifecycle, and panic
+containment are implemented in Rust.
 
 ## Build and test
 
+Build one target or all currently implemented targets:
+
 ```sh
-./scripts/build.sh qt5   # or qt6, gtk2, gtk3, all
-./scripts/smoke-test.sh
+./scripts/build.sh qt5
+./scripts/build.sh gtk3
+./scripts/build.sh all
 ```
 
-Set `LAZARUS_DIR` when Lazarus is installed outside the default path. Binaries
-are written to `build/pdf-wlx-x86_64-linux-<widgetset>.wlx`. Add the binary
-matching Double Commander's widgetset under Options → Plugins → WLX.
+Artifacts are written to the ignored `build/` directory:
 
-The release binaries contain the plugin and dynamic loader only. They do not
-contain MuPDF object code or a `libmupdf` ELF dependency:
+```text
+build/pdf-wlx-x86_64-linux-qt5.wlx
+build/pdf-wlx-x86_64-linux-gtk3.wlx
+```
+
+Run unit, lint, and ABI checks with:
+
+```sh
+cargo fmt --all -- --check
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+./scripts/smoke-test.sh qt5 gtk3
+```
+
+The smoke test verifies the exported WLX symbols, detection string, and plugin
+version without constructing GUI widgets. A successful manual F3 preview in a
+matching Double Commander build remains the definitive integration test.
+
+`./scripts/build.sh qt6` intentionally fails with a clear message until the
+Qt6 shim exists. Do not treat Qt6 as implemented merely because the shared
+Rust logic compiles.
+
+## Release artifacts
+
+Generated `.wlx` files and `build/` are not committed. Build release artifacts
+from the tagged source, run the checks above, and upload the resulting files to
+the corresponding GitHub release.
+
+The plugin binary dynamically links the selected GUI toolkit and the standard
+C++ runtime for Qt5. It does not contain MuPDF object code. Confirm release
+dependencies with:
 
 ```sh
 readelf -d build/pdf-wlx-x86_64-linux-qt5.wlx | grep NEEDED
-nm -D build/pdf-wlx-x86_64-linux-qt5.wlx | grep -E 'mupdf|fz_' || true
 ```
 
-## AGPL compliance and EUPL compatibility
+## Licensing
 
-The plugin's own source remains EUPL 1.2. MuPDF remains AGPL-3+ and is not
-relicensed by this project. The [MuPDF source repository](https://github.com/ArtifexSoftware/mupdf)
-contains its source, `COPYING`, build instructions, and third-party component
-notices. The [MuPDF release page](https://mupdf.com/releases) also states the
-AGPL/commercial licensing options.
-
-For the dynamic build, this repository does not convey MuPDF binaries. A
-GitHub release should nevertheless include:
-
-- this plugin source and its EUPL 1.2 `LICENSE`;
-- this `THIRD-PARTY-NOTICES.md` file;
-- a direct link to the exact MuPDF source/version used for testing;
-- instructions naming the required system MuPDF shared library;
-- source and license notices for any MuPDF modifications made by the user.
-
-If a release later bundles `libmupdf.so`, its source, AGPL license, copyright
-notices, and all dependency notices must be distributed as part of the same
-release. The corresponding source must cover the exact bundled binary, not just
-an unrelated newer MuPDF checkout. Do not describe a bundled release as
-“EUPL-only”.
-
-EUPL 1.2's compatibility mechanism allows compatible copyleft licensing such
-as AGPL v3 for a combined work. It does not turn AGPL code into EUPL code, and
-it does not remove AGPL source, notice, or redistribution requirements. The
-safe interpretation is: keep this repository's original source under EUPL,
-keep MuPDF under AGPL, and allow the applicable AGPL terms to govern any
-combined distribution. Dynamic loading reduces what this project conveys and
-is preferable for GitHub assets, but it is not a legal guarantee that a
-designed runtime dependency is outside AGPL scope. Seek legal review or an
-Artifex commercial license if that distinction matters commercially.
-
-Useful primary references:
-
-- [MuPDF source and AGPL notice](https://github.com/ArtifexSoftware/mupdf);
-- [GNU AGPL v3 text](https://www.gnu.org/licenses/agpl-3.0.html);
-- [MuPDF commercial licensing](https://artifex.com/licensing);
-- [EUPL 1.2 text and compatibility information](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
+The repository's original source is EUPL 1.2. The plugin invokes the external
+`mutool` executable but does not distribute, link, or load MuPDF code. Anyone
+redistributing MuPDF or `mutool` alongside the plugin must comply with the
+applicable AGPL and third-party notice obligations. See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details.
 
 ## Layout
 
 ```text
-pdf-wlx.lpr             WLX entry points and native Qt/GTK viewers
-pdfmupdf.c              dynamic MuPDF adapter
-sdk/                    minimal standalone WLX declarations
-scripts/build.sh        widgetset build and dynamic-link build step
-scripts/smoke-test.sh   ABI and detection checks
-docs/decisions/         architecture and licensing decisions
+Cargo.toml             Qt5 production crate and workspace root
+src/                   safe Rust WLX implementation and Qt5 C++ shim
+gtk3-wlx/              secondary GTK3 crate
+scripts/build.sh       widgetset build wrapper
+scripts/smoke-test.sh  ABI and metadata smoke tests
+docs/decisions/        architecture and licensing decisions
 ```
 
-See [LICENSE](LICENSE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+See [LICENSE](LICENSE), [CHANGELOG.md](CHANGELOG.md), and the architecture
+decisions under [docs/decisions](docs/decisions/).

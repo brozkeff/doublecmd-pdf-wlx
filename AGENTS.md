@@ -1,9 +1,32 @@
 # Agent Notes
 
-This repository contains a standalone Linux WLX PDF viewer for Double Commander. It is written in Free Pascal/Lazarus with a small dynamic C adapter around MuPDF and provides Qt5, Qt6, GTK2, and GTK3 backends.
+This repository contains a standalone Linux WLX PDF viewer for Double
+Commander. Version 0.2.0 is implemented in Rust 2021. Qt5 is the primary,
+manually verified backend; GTK3 is secondary, and Qt6 is not implemented.
 
-The plugin source is EUPL 1.2. MuPDF and its dependencies retain their original licenses; read `THIRD-PARTY-NOTICES.md` before changing release or attribution details. A binary statically linking MuPDF is not EUPL-only and requires the applicable AGPL source and notice obligations, or a commercial MuPDF license.
+The root Cargo package contains the Qt5 WLX ABI and rendering orchestration.
+Keep Qt interaction inside the narrow exception-safe C++ shim in
+`src/qt5_shim.cpp`; all other logic should remain safe Rust where practical.
+Every unsafe operation must have a local `SAFETY` comment, and no panic or C++
+exception may cross the exported C ABI.
 
-Use `./scripts/build.sh {qt5|qt6|gtk2|gtk3|all}` and `./scripts/smoke-test.sh`. Build outputs and local compiler state are ignored. The build requires MuPDF headers; runtime users additionally need a shared `libmupdf.so`, which Ubuntu 22.04's `libmupdf-dev` package does not provide in this environment.
+PDF parsing is delegated to the external `mutool` process. Preserve the
+128-page and 120-DPI limits, shell-free argument passing, private temporary
+directories, synchronous image loading, and cleanup on every return path.
 
-Architecture decisions are in `docs/decisions/`. Accepted decisions are not rewritten; supersede them with a new numbered ADR using minimal `status` and `date` YAML metadata, an H1 title, and `Context and Problem Statement` plus `Decision Outcome` sections.
+Use `./scripts/build.sh {qt5|gtk3|all}` and
+`./scripts/smoke-test.sh qt5 gtk3`. Outputs belong in the ignored `build/`
+directory and must not be committed; upload them only as release assets.
+
+Run `cargo fmt --all -- --check`, `cargo check --workspace`,
+`cargo test --workspace`, and
+`cargo clippy --workspace --all-targets -- -D warnings` before release.
+
+The source is EUPL 1.2. MuPDF and `mutool` retain their original licenses;
+read `THIRD-PARTY-NOTICES.md` before changing runtime, release, or attribution
+details. The plugin must not imply that external MuPDF code is relicensed.
+
+Architecture decisions are in `docs/decisions/`. Accepted decision text is
+not rewritten; supersede it with a new numbered ADR using minimal `status` and
+`date` YAML metadata, an H1 title, and `Context and Problem Statement` plus
+`Decision Outcome` sections.

@@ -3,66 +3,49 @@
 # Copyright (C) 2026 Martin Brozkeff Malec
 # Licensed under the EUPL, Version 1.2.
 
+# Build Rust WLX targets into build/.
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-LAZARUS_DIR=${LAZARUS_DIR:-/usr/share/lazarus/4.8.0}
-PCP=${LAZARUS_PCP:-"$ROOT/.lazarus-config"}
-LINK_DIR="$ROOT/.build-libs"
 BUILD_DIR="$ROOT/build"
+ARCH=$(uname -m)
 
 usage() {
-  printf 'Usage: %s {qt5|qt6|gtk2|gtk3|all}\n' "$0" >&2
+  printf 'Usage: %s {qt5|qt6|gtk3|all}\n' "$0" >&2
   exit 2
 }
 
-[ "$#" -eq 1 ] || usage
-
-build_one() {
-  widgetset=$1
-  mkdir -p "$LINK_DIR"
-  mkdir -p "$BUILD_DIR"
-  cc -fPIC -O2 -c "$ROOT/pdfmupdf.c" -o "$ROOT/pdfmupdf.o"
-  ar rcs "$BUILD_DIR/libpdfmupdf.a" "$ROOT/pdfmupdf.o"
-  case "$widgetset" in
+build_target() {
+  target=$1
+  case "$target" in
     qt5)
-      if [ ! -e "$LINK_DIR/libQt5Pas.so" ]; then
-        versioned=$(ldconfig -p 2>/dev/null | awk '/libQt5Pas\.so\.1 / { print $NF; exit }')
-        if [ -n "$versioned" ]; then
-          ln -sf "$versioned" "$LINK_DIR/libQt5Pas.so"
-        fi
-      fi
+      manifest="$ROOT/Cargo.toml"
+      library=libpdf_wlx_qt5.so
+      ;;
+    gtk3)
+      manifest="$ROOT/gtk3-wlx/Cargo.toml"
+      library=libpdf_wlx_gtk3.so
       ;;
     qt6)
-      if [ ! -e "$LINK_DIR/libQt6Pas.so" ]; then
-        versioned=$(ldconfig -p 2>/dev/null | awk '/libQt6Pas\.so\.6 / { print $NF; exit }')
-        if [ -n "$versioned" ]; then
-          ln -sf "$versioned" "$LINK_DIR/libQt6Pas.so"
-        fi
-      fi
+      printf 'Qt6 Rust WLX is not implemented yet\n' >&2
+      return 1
       ;;
+    *) usage ;;
   esac
-  lazbuild \
-    --pcp="$PCP" \
-    --scp=/etc/lazarus \
-    --lazarusdir="$LAZARUS_DIR" \
-    --ws="$widgetset" \
-    --opt="-k-L$LINK_DIR -k-L$BUILD_DIR -k--whole-archive -k-lpdfmupdf -k--no-whole-archive -k-ldl" \
-    "$ROOT/pdf-wlx.lpi"
-  strip --strip-unneeded "$BUILD_DIR/pdf-wlx-$(uname -m)-linux-$widgetset.wlx"
+
+  cargo build --release --manifest-path "$manifest"
+  mkdir -p "$BUILD_DIR"
+  output="$BUILD_DIR/pdf-wlx-$ARCH-linux-$target.wlx"
+  cp "$ROOT/target/release/$library" "$output"
+  printf 'built: %s\n' "$output"
 }
 
+[ "$#" -eq 1 ] || usage
 case "$1" in
-  qt5|qt6|gtk2|gtk3) build_one "$1" ;;
+  qt5|qt6|gtk3) build_target "$1" ;;
   all)
-    failed=0
-    for widgetset in qt5 qt6 gtk2 gtk3; do
-      if ! build_one "$widgetset"; then
-        printf 'warning: %s build unavailable or failed\n' "$widgetset" >&2
-        failed=1
-      fi
-    done
-    exit "$failed"
+    build_target qt5
+    build_target gtk3
     ;;
   *) usage ;;
 esac

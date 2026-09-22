@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: "Superseded: by 0009-rust-rewrite-and-qt5-primary.md"
 date: 2026-09-22
 ---
 # Initial Implementation and Release
