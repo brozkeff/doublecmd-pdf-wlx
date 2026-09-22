@@ -18,14 +18,19 @@ const MAX_PAGES: usize = 128;
 const RENDER_DPI: u32 = 120;
 const DETECT_STRING: &[u8] = b"EXT=\"PDF\"";
 const LICENSE: &[u8] = b"Copyright (C) 2026 Martin Brozkeff Malec; licensed under the EUPL 1.2\0";
-const VERSION: &[u8] = b"0.2.0-rust-qt5\0";
+const VERSION: &[u8] = b"0.2.2-rust-qt5\0";
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(test)]
+#[path = "../tests/unit/plugin.rs"]
+mod tests;
 
 unsafe extern "C" {
     fn pdf_wlx_qt5_create(
         parent_handle: *mut c_void,
         page_paths: *const *const c_char,
         page_count: usize,
+        document_page_count: usize,
     ) -> *mut c_void;
     fn pdf_wlx_qt5_destroy(window_handle: *mut c_void);
 }
@@ -34,6 +39,7 @@ unsafe extern "C" {
 struct TempPages {
     directory: PathBuf,
     pages: Vec<PathBuf>,
+    document_pages: usize,
 }
 
 impl Drop for TempPages {
@@ -58,8 +64,10 @@ fn temporary_directory() -> Result<PathBuf, ()> {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))
-                    .map_err(|_| ())?;
+                if fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).is_err() {
+                    let _ = fs::remove_dir(&directory);
+                    return Err(());
+                }
             }
             return Ok(directory);
         }
@@ -89,29 +97,30 @@ fn render_pages(file_name: &Path) -> Result<TempPages, ()> {
     }
 
     let directory = temporary_directory()?;
+    let mut rendered = TempPages {
+        directory,
+        pages: Vec::with_capacity(1),
+        document_pages: pages,
+    };
     let status = Command::new("mutool")
         .args(["draw", "-q", "-r"])
         .arg(RENDER_DPI.to_string())
         .arg("-o")
-        .arg(directory.join("%d.png"))
+        .arg(rendered.directory.join("%d.png"))
         .arg(file_name)
-        .arg(format!("1-{pages}"))
+        .arg("1")
         .status()
         .map_err(|_| ())?;
     if !status.success() {
         return Err(());
     }
 
-    let page_paths: Vec<_> = (1..=pages)
-        .map(|page| directory.join(format!("{page}.png")))
-        .collect();
-    if page_paths.iter().any(|page| !page.is_file()) {
+    let first_page = rendered.directory.join("1.png");
+    if !first_page.is_file() {
         return Err(());
     }
-    Ok(TempPages {
-        directory,
-        pages: page_paths,
-    })
+    rendered.pages.push(first_page);
+    Ok(rendered)
 }
 
 fn path_from_c_string(file_to_load: *const c_char) -> PathBuf {
@@ -150,7 +159,14 @@ fn load_plugin(parent: *mut c_void, file_to_load: *const c_char) -> *mut c_void 
     // SAFETY: Double Commander calls ListLoad on its Qt GUI thread and gives
     // us a live QWidget parent. All path pointers remain valid for this call;
     // the C++ shim loads each QPixmap synchronously and retains no pointer.
-    unsafe { pdf_wlx_qt5_create(parent, path_pointers.as_ptr(), path_pointers.len()) }
+    unsafe {
+        pdf_wlx_qt5_create(
+            parent,
+            path_pointers.as_ptr(),
+            path_pointers.len(),
+            rendered.document_pages,
+        )
+    }
 }
 
 fn guarded<T>(operation: impl FnOnce() -> T) -> Option<T> {
@@ -213,22 +229,4 @@ pub extern "C" fn PdfWlxLicense() -> *const c_char {
 #[no_mangle]
 pub extern "C" fn PdfWlxVersion() -> *const c_char {
     VERSION.as_ptr().cast()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_page_count() {
-        assert_eq!(page_count(b"PDF-1.7\nPages: 3\n"), Some(3));
-        assert_eq!(page_count(b"invalid"), None);
-    }
-
-    #[test]
-    fn writes_terminated_detection_string() {
-        let mut output = [0xff; 4];
-        write_detect_string(&mut output);
-        assert_eq!(output, [b'E', b'X', b'T', 0]);
-    }
 }

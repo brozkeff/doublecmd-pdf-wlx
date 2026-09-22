@@ -1,13 +1,12 @@
 # PDF WLX viewer for Double Commander
 
 Standalone Linux WLX plugin for quick PDF previews in Double Commander. Select
-a PDF and press F3 to render a scrollable column of pages inside the internal
-Lister.
+a PDF and press F3 to render a scrollable first-page preview inside the
+internal Lister.
 
-Version 0.2.0 is a Rust rewrite. The Qt5 backend is the primary implementation
-and has been manually verified with the official Qt5 Double Commander package.
-A GTK3 backend is also included, but official Double Commander packages do not
-currently provide a matching GTK3 build. Qt6 is planned but not implemented.
+Version 0.2.2 is the current Qt5-only patch of the Rust rewrite, manually
+verified with the official Qt5 Double Commander package. GTK3 and Qt6 are not
+supported targets.
 
 The previous Pascal/Lazarus implementation remains available from Git tag
 `v0.1.0` and commit `62e4ac2`.
@@ -20,7 +19,9 @@ the GNU AGPL v3 or later; see
 ## Features and limits
 
 - Detects `.pdf` files through the standard WLX ABI.
-- Renders pages at 120 DPI through a `mutool` child process.
+- Renders only the first page at 120 DPI through a `mutool` child process.
+- Shows `Page 1 of N` when the PDF contains additional pages.
+- Closes the active Lister window on Escape; the host's Q shortcut still works.
 - Rejects invalid, encrypted, empty, and over-128-page documents.
 - Uses private temporary directories and removes rendered pages after native
   widgets have loaded them.
@@ -43,13 +44,13 @@ sudo apt install mupdf-tools libqt5widgets5
 `mutool` must be available in the `PATH` inherited by Double Commander. The
 plugin does not bundle or dynamically load MuPDF libraries.
 
-The optional GTK3 plugin additionally requires the GTK3 runtime and a GTK3
-build of Double Commander. It cannot be loaded into GTK2, Qt5, or Qt6 builds.
+Color profile files, including a CMYK-to-sRGB device link, are tracked under
+`assets/icc/` for the planned profile-aware renderer. The current `mutool`
+command-line path does not load them for fallback color management.
 
 ## Install
 
-Use the plugin matching the Double Commander widgetset. For the supported Qt5
-package, select this file from a release or local build:
+Select this plugin from a release or local build:
 
 ```text
 build/pdf-wlx-x86_64-linux-qt5.wlx
@@ -61,38 +62,29 @@ In Double Commander, open **Configuration → Options → Plugins → WLX**, cho
 ## Build requirements
 
 Install a current Rust toolchain, C++ compiler, `pkg-config`, MuPDF tools, and
-the development package for the selected widgetset. On Ubuntu or Debian:
+Qt5 development files. On Ubuntu or Debian:
 
 ```sh
 sudo apt install build-essential cargo pkg-config mupdf-tools qtbase5-dev
 ```
 
-For the optional GTK3 target, also install:
-
-```sh
-sudo apt install libgtk-3-dev
-```
-
-The Qt5 build uses Rust 2021, `cc`, and `pkg-config`. A small C++ shim performs
-only QWidget creation and destruction because Qt has no stable C ABI. The
-remaining WLX validation, rendering, temporary-file lifecycle, and panic
-containment are implemented in Rust.
+The Qt5 build uses Rust 2021, `cc`, and `pkg-config`. A small C++ shim creates
+and destroys the viewer widgets and handles Escape because Qt has no stable C
+ABI. The remaining WLX validation, rendering, temporary-file lifecycle, and
+panic containment are implemented in Rust.
 
 ## Build and test
 
-Build one target or all currently implemented targets:
+Build the Qt5 plugin:
 
 ```sh
-./scripts/build.sh qt5
-./scripts/build.sh gtk3
-./scripts/build.sh all
+./scripts/build.sh
 ```
 
 Artifacts are written to the ignored `build/` directory:
 
 ```text
 build/pdf-wlx-x86_64-linux-qt5.wlx
-build/pdf-wlx-x86_64-linux-gtk3.wlx
 ```
 
 Run unit, lint, and ABI checks with:
@@ -102,16 +94,15 @@ cargo fmt --all -- --check
 cargo check --workspace
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-./scripts/smoke-test.sh qt5 gtk3
+./scripts/smoke-test.sh
 ```
 
 The smoke test verifies the exported WLX symbols, detection string, and plugin
 version without constructing GUI widgets. A successful manual F3 preview in a
 matching Double Commander build remains the definitive integration test.
 
-`./scripts/build.sh qt6` intentionally fails with a clear message until the
-Qt6 shim exists. Do not treat Qt6 as implemented merely because the shared
-Rust logic compiles.
+Qt6 is not implemented; do not treat it as supported merely because the
+shared Rust logic compiles.
 
 ## Release artifacts
 
@@ -119,9 +110,8 @@ Generated `.wlx` files and `build/` are not committed. Build release artifacts
 from the tagged source, run the checks above, and upload the resulting files to
 the corresponding GitHub release.
 
-The plugin binary dynamically links the selected GUI toolkit and the standard
-C++ runtime for Qt5. It does not contain MuPDF object code. Confirm release
-dependencies with:
+The plugin binary dynamically links Qt5 and the standard C++ runtime. It does
+not contain MuPDF object code. Confirm release dependencies with:
 
 ```sh
 readelf -d build/pdf-wlx-x86_64-linux-qt5.wlx | grep NEEDED
@@ -138,11 +128,12 @@ applicable AGPL and third-party notice obligations. See
 ## Layout
 
 ```text
-Cargo.toml             Qt5 production crate and workspace root
+Cargo.toml             Qt5 production crate
 src/                   safe Rust WLX implementation and Qt5 C++ shim
-gtk3-wlx/              secondary GTK3 crate
-scripts/build.sh       widgetset build wrapper
-scripts/smoke-test.sh  ABI and metadata smoke tests
+tests/unit/            Rust unit test modules
+scripts/build.sh       Qt5 release build wrapper
+scripts/smoke-test.sh  Qt5 ABI and metadata smoke test
+assets/icc/            ICC profile resources for planned color management
 docs/decisions/        architecture and licensing decisions
 ```
 

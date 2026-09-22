@@ -1,8 +1,8 @@
 # Agent Notes
 
 This repository contains a standalone Linux WLX PDF viewer for Double
-Commander. Version 0.2.0 is implemented in Rust 2021. Qt5 is the primary,
-manually verified backend; GTK3 is secondary, and Qt6 is not implemented.
+Commander. Version 0.2.2 is implemented in Rust 2021 and supports the manually
+verified Qt5 Double Commander package. Qt5 is the only supported target.
 
 The root Cargo package contains the Qt5 WLX ABI and rendering orchestration.
 Keep Qt interaction inside the narrow exception-safe C++ shim in
@@ -10,13 +10,14 @@ Keep Qt interaction inside the narrow exception-safe C++ shim in
 Every unsafe operation must have a local `SAFETY` comment, and no panic or C++
 exception may cross the exported C ABI.
 
-PDF parsing is delegated to the external `mutool` process. Preserve the
-128-page and 120-DPI limits, shell-free argument passing, private temporary
-directories, synchronous image loading, and cleanup on every return path.
+PDF parsing is delegated to the external `mutool` process. Render only the
+first page for the quick preview while preserving the 128-page and 120-DPI
+limits, shell-free argument passing, private temporary directories,
+synchronous image loading, and cleanup on every return path.
 
-Use `./scripts/build.sh {qt5|gtk3|all}` and
-`./scripts/smoke-test.sh qt5 gtk3`. Outputs belong in the ignored `build/`
-directory and must not be committed; upload them only as release assets.
+Use `./scripts/build.sh` and `./scripts/smoke-test.sh`. Outputs belong in the
+ignored `build/` directory and must not be committed; upload them only as
+release assets.
 
 Run `cargo fmt --all -- --check`, `cargo check --workspace`,
 `cargo test --workspace`, and
