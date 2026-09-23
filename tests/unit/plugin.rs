@@ -1,5 +1,8 @@
-use super::{page_count, write_detect_string};
+#[cfg(feature = "mutool")]
+use super::page_count;
+use super::write_detect_string;
 
+#[cfg(feature = "mutool")]
 #[test]
 fn parses_page_count() {
     assert_eq!(page_count(b"PDF-1.7\nPages: 3\n"), Some(3));

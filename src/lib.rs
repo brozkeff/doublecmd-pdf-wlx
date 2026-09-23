@@ -1,23 +1,39 @@
 // Copyright (C) 2026 Martin Brozkeff Malec
-// Licensed under the EUPL, Version 1.2.
+// SPDX-License-Identifier: EUPL-1.2 OR GPL-2.0-or-later OR AGPL-3.0-or-later
 
 //! Production Qt5 WLX plugin for Double Commander.
 //!
-//! Rust owns WLX validation, rendering, temporary files, and panic
-//! containment. A deliberately small C++ shim owns the QWidget operations
-//! because Qt does not expose a stable C ABI.
+//! Rust owns the WLX entry points, panic containment, and the `mutool`
+//! subprocess backend. The C++ shim owns Qt widgets and Poppler's C++ API calls
+//! because neither library exposes a stable C ABI.
 
-use std::ffi::{c_char, c_void, CStr, CString, OsStr};
+use std::ffi::{c_char, c_void};
+#[cfg(feature = "mutool")]
+use std::ffi::{CStr, CString, OsStr};
+#[cfg(feature = "mutool")]
 use std::fs;
+#[cfg(feature = "mutool")]
 use std::path::{Path, PathBuf};
+#[cfg(feature = "mutool")]
 use std::process::Command;
+#[cfg(feature = "mutool")]
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(feature = "mutool")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const RENDER_DPI: u32 = 120;
 const DETECT_STRING: &[u8] = b"EXT=\"PDF\"";
-const LICENSE: &[u8] = b"Copyright (C) 2026 Martin Brozkeff Malec; licensed under the EUPL 1.2\0";
-const VERSION: &[u8] = b"0.2.3-rust-qt5\0";
+#[cfg(feature = "poppler-splash")]
+const LICENSE: &[u8] =
+    b"GPL-2.0-or-later; project source also EUPL-1.2; see THIRD-PARTY-NOTICES.md\0";
+#[cfg(feature = "mutool")]
+const LICENSE: &[u8] =
+    b"AGPL-3.0-or-later; project source also EUPL-1.2; see THIRD-PARTY-NOTICES.md\0";
+#[cfg(feature = "poppler-splash")]
+const VERSION: &[u8] = b"0.3.0-poppler-splash-qt5\0";
+#[cfg(feature = "mutool")]
+const VERSION: &[u8] = b"0.3.0-mutool-qt5\0";
+#[cfg(feature = "mutool")]
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[cfg(test)]
@@ -25,15 +41,23 @@ static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 mod tests;
 
 unsafe extern "C" {
+    #[cfg(feature = "mutool")]
     fn pdf_wlx_qt5_create(
         parent_handle: *mut c_void,
         page_paths: *const *const c_char,
         page_count: usize,
         document_page_count: usize,
     ) -> *mut c_void;
+    #[cfg(feature = "poppler-splash")]
+    fn pdf_wlx_poppler_create(
+        parent_handle: *mut c_void,
+        file_name: *const c_char,
+        render_dpi: u32,
+    ) -> *mut c_void;
     fn pdf_wlx_qt5_destroy(window_handle: *mut c_void);
 }
 
+#[cfg(feature = "mutool")]
 #[derive(Debug)]
 struct TempPages {
     directory: PathBuf,
@@ -41,12 +65,14 @@ struct TempPages {
     document_pages: usize,
 }
 
+#[cfg(feature = "mutool")]
 impl Drop for TempPages {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.directory);
     }
 }
 
+#[cfg(feature = "mutool")]
 fn temporary_directory() -> Result<PathBuf, ()> {
     let root = std::env::temp_dir();
     for _ in 0..16 {
@@ -74,6 +100,7 @@ fn temporary_directory() -> Result<PathBuf, ()> {
     Err(())
 }
 
+#[cfg(feature = "mutool")]
 fn page_count(output: &[u8]) -> Option<usize> {
     std::str::from_utf8(output)
         .ok()?
@@ -81,6 +108,7 @@ fn page_count(output: &[u8]) -> Option<usize> {
         .find_map(|line| line.strip_prefix("Pages:")?.trim().parse().ok())
 }
 
+#[cfg(feature = "mutool")]
 fn render_pages(file_name: &Path) -> Result<TempPages, ()> {
     let info = Command::new("mutool")
         .arg("info")
@@ -122,6 +150,7 @@ fn render_pages(file_name: &Path) -> Result<TempPages, ()> {
     Ok(rendered)
 }
 
+#[cfg(feature = "mutool")]
 fn path_from_c_string(file_to_load: *const c_char) -> PathBuf {
     // SAFETY: WLX supplies a valid NUL-terminated filename for the duration
     // of ListLoad, which validated that the pointer is non-null.
@@ -137,6 +166,7 @@ fn path_from_c_string(file_to_load: *const c_char) -> PathBuf {
     }
 }
 
+#[cfg(feature = "mutool")]
 fn load_plugin(parent: *mut c_void, file_to_load: *const c_char) -> *mut c_void {
     if parent.is_null() || file_to_load.is_null() {
         return std::ptr::null_mut();
@@ -166,6 +196,17 @@ fn load_plugin(parent: *mut c_void, file_to_load: *const c_char) -> *mut c_void 
             rendered.document_pages,
         )
     }
+}
+
+#[cfg(feature = "poppler-splash")]
+fn load_plugin(parent: *mut c_void, file_to_load: *const c_char) -> *mut c_void {
+    if parent.is_null() || file_to_load.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    // SAFETY: WLX supplies a valid filename pointer for this call and the
+    // Qt5 shim copies the rendered page into a QWidget before returning.
+    unsafe { pdf_wlx_poppler_create(parent, file_to_load, RENDER_DPI) }
 }
 
 fn guarded<T>(operation: impl FnOnce() -> T) -> Option<T> {

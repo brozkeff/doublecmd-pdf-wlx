@@ -2,6 +2,23 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## [v0.3.0] - 2026-09-23
+
+### Added
+
+- Add Poppler Splash as the default in-memory renderer, with graphics and text
+  antialiasing and light text hinting. Manual Double Commander testing
+  confirmed smooth, readable rendering and good CMYK color conversion.
+- Keep `mutool` as an optional renderer and build both backend artifacts by
+  default, each with its own selected-license metadata and text sidecar.
+- Offer project-authored source under EUPL-1.2, GPL-2.0-or-later, or
+  AGPL-3.0-or-later, with artifact licensing selected by backend.
+- Set the package and exported plugin versions to 0.3.0.
+
+### Changed
+
+- Release version 0.3.0 with Poppler Splash as the default renderer.
+
 ## [v0.2.3] - 2026-09-23
 
 ### Fixed

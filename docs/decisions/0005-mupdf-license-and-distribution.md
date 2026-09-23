@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: "Superseded: by 0012-poppler-splash-default-and-backend-licensing.md"
 date: 2026-09-22
 ---
 # MuPDF License and Binary Distribution
