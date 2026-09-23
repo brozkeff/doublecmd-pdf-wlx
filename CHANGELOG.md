@@ -2,6 +2,14 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## [v0.2.3] - 2026-09-23
+
+### Fixed
+
+- Allow first-page previews of PDFs with more than 128 pages; keep rejecting
+  invalid, encrypted, and empty documents.
+- Bump the plugin package and exported version metadata to 0.2.3.
+
 ## [v0.2.2] - 2026-09-23
 
 ### Changed

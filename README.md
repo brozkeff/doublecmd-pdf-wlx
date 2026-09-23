@@ -4,7 +4,7 @@ Standalone Linux WLX plugin for quick PDF previews in Double Commander. Select
 a PDF and press F3 to render a scrollable first-page preview inside the
 internal Lister.
 
-Version 0.2.2 is the current Qt5-only patch of the Rust rewrite, manually
+Version 0.2.3 is the current Qt5-only patch of the Rust rewrite, manually
 verified with the official Qt5 Double Commander package. GTK3 and Qt6 are not
 supported targets.
 
@@ -22,7 +22,8 @@ the GNU AGPL v3 or later; see
 - Renders only the first page at 120 DPI through a `mutool` child process.
 - Shows `Page 1 of N` when the PDF contains additional pages.
 - Closes the active Lister window on Escape; the host's Q shortcut still works.
-- Rejects invalid, encrypted, empty, and over-128-page documents.
+- Rejects invalid, encrypted, and empty documents. There is no page-count cap
+  because the viewer renders only the first page.
 - Uses private temporary directories and removes rendered pages after native
   widgets have loaded them.
 - Contains panics and C++ exceptions at the plugin boundary.

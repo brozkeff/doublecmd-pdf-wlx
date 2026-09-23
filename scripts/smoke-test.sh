@@ -34,6 +34,6 @@ assert buffer.value == b'EXT="PDF"', buffer.value
 
 version = plugin.PdfWlxVersion
 version.restype = ctypes.c_char_p
-assert version() == b"0.2.2-rust-qt5", version()
+assert version() == b"0.2.3-rust-qt5", version()
 print(f"ok: {os.path.basename(os.environ['PLUGIN'])}")
 PY

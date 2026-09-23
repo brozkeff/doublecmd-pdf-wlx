@@ -1,7 +1,7 @@
 # Agent Notes
 
 This repository contains a standalone Linux WLX PDF viewer for Double
-Commander. Version 0.2.2 is implemented in Rust 2021 and supports the manually
+Commander. Version 0.2.3 is implemented in Rust 2021 and supports the manually
 verified Qt5 Double Commander package. Qt5 is the only supported target.
 
 The root Cargo package contains the Qt5 WLX ABI and rendering orchestration.
@@ -11,8 +11,8 @@ Every unsafe operation must have a local `SAFETY` comment, and no panic or C++
 exception may cross the exported C ABI.
 
 PDF parsing is delegated to the external `mutool` process. Render only the
-first page for the quick preview while preserving the 128-page and 120-DPI
-limits, shell-free argument passing, private temporary directories,
+first page for the quick preview without a page-count ceiling. Preserve the
+120-DPI limit, shell-free argument passing, private temporary directories,
 synchronous image loading, and cleanup on every return path.
 
 Use `./scripts/build.sh` and `./scripts/smoke-test.sh`. Outputs belong in the

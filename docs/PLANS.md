@@ -3,9 +3,15 @@
 ## Goal
 
 Make F3 preview useful immediately for multipage PDFs, then investigate a
-profile-aware renderer and non-blocking page navigation. The Qt5-only v0.2.2
+profile-aware renderer and non-blocking page navigation. The Qt5-only v0.2.3
 preview renders only the first page so opening a long document does not
 rasterize pages the user cannot see yet.
+
+## v0.2.3: Unbounded first-page preview
+
+- [x] Remove the page-count ceiling while retaining page-count validation.
+- [x] Keep rendering only page 1 at 120 DPI and report the document page count.
+- [x] Update the package version, exported version string, and user docs.
 
 ## v0.2.2: Qt5-only maintenance patch
 
@@ -17,7 +23,8 @@ rasterize pages the user cannot see yet.
 ## v0.2.1: First-page fast path
 
 - [x] Render and display only page 1 in the Qt5 backend.
-- [x] Keep page-count validation, the 128-page limit, and 120 DPI rendering.
+- [x] Keep page-count validation and 120 DPI rendering. The 128-page ceiling
+      was removed in v0.2.3 because only the first page is rendered.
 - [x] Show `Page 1 of N` when the PDF contains more than one page.
 - [x] Update the Qt5 package version, exported version string, and user docs.
 - [ ] Benchmark 1-page, 30-page, and 128-page fixtures for time to first page,
@@ -26,9 +33,10 @@ rasterize pages the user cannot see yet.
   the 1-page fixture on the same machine.
 - [x] Manually verify the Qt5 preview in the official Double Commander package.
 
-The page-count check still rejects invalid, encrypted, empty, and over-limit
-documents. Preview images remain private temporary PNG files and are removed
-on normal success and failure paths. A process crash can still leave a file.
+The page-count check rejects invalid, encrypted, and empty documents without an
+upper page-count limit. Preview images remain private temporary PNG files and
+are removed on normal success and failure paths. A process crash can still
+leave a file.
 
 ## v0.3.0: Profile-aware, on-demand rendering
 

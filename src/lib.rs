@@ -14,11 +14,10 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const MAX_PAGES: usize = 128;
 const RENDER_DPI: u32 = 120;
 const DETECT_STRING: &[u8] = b"EXT=\"PDF\"";
 const LICENSE: &[u8] = b"Copyright (C) 2026 Martin Brozkeff Malec; licensed under the EUPL 1.2\0";
-const VERSION: &[u8] = b"0.2.2-rust-qt5\0";
+const VERSION: &[u8] = b"0.2.3-rust-qt5\0";
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[cfg(test)]
@@ -92,7 +91,7 @@ fn render_pages(file_name: &Path) -> Result<TempPages, ()> {
         return Err(());
     }
     let pages = page_count(&info.stdout).ok_or(())?;
-    if pages == 0 || pages > MAX_PAGES {
+    if pages == 0 {
         return Err(());
     }
 
